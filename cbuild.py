@@ -84,26 +84,15 @@ def build(
             include_dir = flag[2:].strip()
             include_dirs.append(include_dir)
 
-    files = list(
+    c_files = list(
         get_files_recursively(
             ".",
             dirs_filter=lambda d: d not in config.ignore_dirs,
-            files_filter=lambda f: any(f.endswith(ext) for ext in [".c", ".h"]),
+            files_filter=lambda f: any(f.endswith(ext) for ext in [".c"]),
         )
     )
-    includes_map = {}
-    for file in files:
-        with open(file, "r") as fp:
-            file_includes = collect_includes(fp)
-        local_includes = resolve_local_includes(
-            ".",
-            file,
-            file_includes,
-            include_dirs,
-        )
-        includes_map[file] = local_includes
-
-    c_files = [f for f in files if f.endswith(".c")]
+    dependencies = {}
+    collect_dependencies(config.project_root, include_dirs, dependencies, c_files)
 
     if len(c_files) == 0:
         print("No files to compile.")
@@ -130,7 +119,7 @@ def build(
         if file_mtime > object_mtime:
             should_recompile = True
         else:
-            should_recompile = any_dep_changed(includes_map, file, object_mtime)
+            should_recompile = any_dep_changed(dependencies, file, object_mtime)
 
         if should_recompile:
             if not any_compiled:
@@ -151,18 +140,37 @@ def build(
     return True
 
 
-def any_dep_changed(includes_map, file, object_mtime):
-    for dep in includes_map[file]:
+def any_dep_changed(dependencies, file, object_mtime):
+    for dep in dependencies[file]:
         dep_stat = os.stat(dep)
         dep_mtime = dep_stat.st_mtime
         if dep_mtime > object_mtime:
             return True
-        if any_dep_changed(includes_map, dep, object_mtime):
+        if any_dep_changed(dependencies, dep, object_mtime):
             return True
     return False
 
 
-def resolve_local_includes(
+def collect_dependencies(project_root, include_dirs, dependencies, files):
+    """
+    Find dependencies of each file in `files`, store them in dependencies.
+    Recursively store their dependencies as well.
+    """
+    for file in files:
+        if file in dependencies:
+            continue
+
+        with open(file) as fp:
+            includes = get_includes(fp)
+
+        include_paths = resolve_include_paths(
+            project_root, file, includes, include_dirs
+        )
+        dependencies[file] = include_paths
+        collect_dependencies(project_root, include_dirs, dependencies, include_paths)
+
+
+def resolve_include_paths(
     project_root,
     file,
     includes,
@@ -218,7 +226,7 @@ def filter_subdirs(root, dirs, ignore: list[str]):
     dirs[:] = [d for d in dirs if str(root / d) not in ignore]
 
 
-def collect_includes(file):
+def get_includes(file):
     """
     Returns a list of (include_type, file).
 
