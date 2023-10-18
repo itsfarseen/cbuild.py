@@ -52,14 +52,27 @@ class CBuildTests(unittest.TestCase):
     def _record_runs(self, cmd):
         self.runs.append(cmd)
 
-    def _assert_ran(self, cmd, msg=None):
-        if msg:
-            msg = "Reason: " + msg
+    def _assert_ran(self, cmd_components, msg=None):
         try:
             top = self.runs.popleft()
         except IndexError:
+            if msg:
+                msg = "Reason: " + msg
             self.fail(msg)
-        self.assertEqual(top.split(), cmd.split(), msg)
+
+        top_exec = top.split()[0]
+        self.assertEqual(
+            top_exec,
+            cmd_components[0],
+            "executable is not the same. " + (msg or ""),
+        )
+
+        for comp in cmd_components[1:]:
+            self.assertIn(
+                comp,
+                top,
+                f"'{comp}' is missing in {top}. " + (msg or ""),
+            )
 
     def _assert_nothing_ran(self):
         self.assertEqual(
@@ -67,6 +80,10 @@ class CBuildTests(unittest.TestCase):
             0,
             "Expected runs to be empty. Got [{}] instead".format(", ".join(self.runs)),
         )
+
+    def _touch(self, file):
+        file = os.path.join(self.tmpdir.name, file)
+        os.utime(file)
 
     def test_gcc_works(self):
         self._setup_files(
@@ -107,7 +124,6 @@ class CBuildTests(unittest.TestCase):
                 "includes/libb": ("symlink", "vendor/libb"),
                 "vendor/libc/lib.h": "",
                 "src/libc": ("symlink", "vendor/libc"),
-                "src/unused.h": "",
             }
         )
         config = cbuild.Config(
@@ -119,8 +135,8 @@ class CBuildTests(unittest.TestCase):
         )
         cbuild.build(config)
 
-        self._assert_ran("gcc -Iincludes -c src/foo.c -o build/src/foo.o")
-        self._assert_ran("gcc build/src/foo.o -o build/main")
+        self._assert_ran(["gcc", "src/foo.c"])
+        self._assert_ran(["gcc", "build/main"])
 
         cbuild.build(config)
         self._assert_nothing_ran()
@@ -132,44 +148,114 @@ class CBuildTests(unittest.TestCase):
             "vendor/libb/lib.h",
             "vendor/libc/lib.h",
         ]:
-            file = os.path.join(self.tmpdir.name, file)
-            os.utime(file)
+            self._touch(file)
             cbuild.build(config)
-            self._assert_ran("gcc -Iincludes -c src/foo.c -o build/src/foo.o", file)
-            self._assert_ran("gcc build/src/foo.o -o build/main", file)
+            self._assert_ran(["gcc", "src/foo.c"], file)
+            self._assert_ran(["gcc", "build/main"], file)
 
-        os.utime(
-            os.path.join(
-                self.tmpdir.name,
-                "src",
-                "unused.h",
-            )
+    def test_unused_include(self):
+        self._setup_files(
+            {
+                "src/foo.c": """
+                    #include "bar.h"
+
+                    int main() {}
+                """,
+                "src/bar.h": "",
+                "src/unused.h": "",
+            }
         )
+        config = cbuild.Config(
+            project_root=self.tmpdir.name,
+            cc="gcc",
+            build_dir="build",
+            binary="main",
+        )
+        cbuild.build(config)
+
+        self._assert_ran(["gcc", "src/foo.c"])
+        self._assert_ran(["gcc", "build/main"])
+
         cbuild.build(config)
         self._assert_nothing_ran()
 
-    #
-    # def test_include_symlinks(self):
-    #     pass
+        self._touch("src/bar.h")
+        cbuild.build(config)
+        self._assert_ran(["gcc", "src/foo.c"])
+        self._assert_ran(["gcc", "build/main"])
 
-    # def test(self):
-    #     files = {
-    #         "src/foo.c": """
-    #             #include "foo.h"
-    #             #include "../bar.h"
-    #             #include <liba.h>
-    #             #include <libb.h>
-    #         """,
-    #         "src/bar/baz.c": "",
-    #         "src/unused.h": "",
-    #         "src/foo.h": "",
-    #         "bar.h": "",
-    #         "vendor/liba/lib.h": "",
-    #         "include/liba.h": ("symlink", "vendor/liba/lib.h"),
-    #         "include/libb.h": "",
-    #     }
-    #
-    #     # Create files
+        self._touch("src/unused.h")
+        cbuild.build(config)
+        self._assert_nothing_ran()
+
+    def test_transitive_deps(self):
+        self._setup_files(
+            {
+                "src/foo.c": """
+                    #include "bar.h"
+
+                    int main() {}
+                """,
+                "src/bar.h": """
+                    #include "baz.h"
+                """,
+                "src/baz.h": "",
+            }
+        )
+        config = cbuild.Config(
+            project_root=self.tmpdir.name,
+            cc="gcc",
+            build_dir="build",
+            binary="main",
+        )
+        cbuild.build(config)
+
+        self._assert_ran(["gcc", "src/foo.c"])
+        self._assert_ran(["gcc", "build/main"])
+
+        cbuild.build(config)
+        self._assert_nothing_ran()
+
+        self._touch("src/baz.h")
+        cbuild.build(config)
+        self._assert_ran(["gcc", "src/foo.c"])
+        self._assert_ran(["gcc", "build/main"])
+
+    def test_multiple_c_files(self):
+        self._setup_files(
+            {
+                "src/foo.c": """
+                    int main() {}
+                """,
+                "src/bar.c": """
+                    int foo() {}
+                """,
+            }
+        )
+        config = cbuild.Config(
+            project_root=self.tmpdir.name,
+            cc="gcc",
+            build_dir="build",
+            binary="main",
+        )
+        cbuild.build(config)
+
+        self._assert_ran(["gcc"])
+        self._assert_ran(["gcc"])
+        self._assert_ran(["gcc", "build/src/foo.o", "build/src/bar.o", "build/main"])
+
+        cbuild.build(config)
+        self._assert_nothing_ran()
+
+        self._touch("src/foo.c")
+        cbuild.build(config)
+        self._assert_ran(["gcc", "src/foo.c"])
+        self._assert_ran(["gcc", "build/src/foo.o", "build/src/bar.o", "build/main"])
+
+        self._touch("src/bar.c")
+        cbuild.build(config)
+        self._assert_ran(["gcc", "src/bar.c"])
+        self._assert_ran(["gcc", "build/src/foo.o", "build/src/bar.o", "build/main"])
 
 
 if __name__ == "__main__":

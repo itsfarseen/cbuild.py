@@ -130,12 +130,7 @@ def build(
         if file_mtime > object_mtime:
             should_recompile = True
         else:
-            for dep in includes_map[file]:
-                dep_stat = os.stat(dep)
-                dep_mtime = dep_stat.st_mtime
-                if dep_mtime > object_mtime:
-                    should_recompile = True
-                    break
+            should_recompile = any_dep_changed(includes_map, file, object_mtime)
 
         if should_recompile:
             if not any_compiled:
@@ -154,6 +149,17 @@ def build(
     else:
         print("All up-to-date")
     return True
+
+
+def any_dep_changed(includes_map, file, object_mtime):
+    for dep in includes_map[file]:
+        dep_stat = os.stat(dep)
+        dep_mtime = dep_stat.st_mtime
+        if dep_mtime > object_mtime:
+            return True
+        if any_dep_changed(includes_map, dep, object_mtime):
+            return True
+    return False
 
 
 def resolve_local_includes(
@@ -178,21 +184,20 @@ def resolve_local_includes(
 
     local_includes = []
     for include_type, include in includes:
-        # Search relative to the file only if it's a local include
-        # ie, it's in quotes: #include "file.h"
         if include_type == "quote":
-            local_include = os.path.normpath(os.path.join(file_dir, include))
-            if os.path.exists(local_include):
-                local_includes.append(local_include)
+            include_path = os.path.realpath(os.path.join(file_dir, include))
+            if include_path.startswith(project_root + "/"):
+                relative_path = include_path[len(project_root) + 1 :]
+                local_includes.append(relative_path)
                 continue
 
         for include_dir in include_dirs:
-            remote_include = os.path.join(include_dir, include)
-            if os.path.exists(remote_include):
-                remote_include = os.path.realpath(remote_include)
-                if remote_include.startswith(project_root + "/"):
-                    local_include = remote_include[len(project_root) + 1 :]
-                    local_includes.append(local_include)
+            include_path = os.path.join(include_dir, include)
+            if os.path.exists(include_path):
+                include_path = os.path.realpath(include_path)
+                if include_path.startswith(project_root + "/"):
+                    relative_path = include_path[len(project_root) + 1 :]
+                    local_includes.append(relative_path)
                     break
 
     return local_includes
@@ -204,6 +209,7 @@ def get_files_recursively(root, dirs_filter, files_filter):
         dirpath = os.path.normpath(dirpath)
         for filename in filenames:
             filepath = os.path.join(dirpath, filename)
+            filepath = os.path.normpath(filepath)
             if files_filter(filepath):
                 yield filepath
 
