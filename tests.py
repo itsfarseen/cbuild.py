@@ -257,6 +257,56 @@ class CBuildTests(unittest.TestCase):
         self._assert_ran(["gcc", "src/bar.c"])
         self._assert_ran(["gcc", "build/src/foo.o", "build/src/bar.o", "build/main"])
 
+    def test_quoted_include_not_in_same_dir(self):
+        self._setup_files(
+            {
+                "src/foo.c": """
+                    #include "lib.h"
+
+                    int main() {}
+                """,
+                "includes/lib.h": "",
+            }
+        )
+        config = cbuild.Config(
+            project_root=self.tmpdir.name,
+            cc="gcc",
+            cflags="-Iincludes",
+            build_dir="build",
+            binary="main",
+        )
+        cbuild.build(config)
+
+        self._assert_ran(["gcc", "src/foo.c"])
+        self._assert_ran(["gcc", "build/src/foo.o", "build/main"])
+
+        cbuild.build(config)
+        self._assert_nothing_ran()
+
+        self._touch("includes/lib.h")
+        cbuild.build(config)
+        self._assert_ran(["gcc", "src/foo.c"])
+        self._assert_ran(["gcc", "build/src/foo.o", "build/main"])
+
+    def test_ignore_dirs_work(self):
+        self._setup_files(
+            {
+                "ignored/foo.c": """
+                    int main() {}
+                """,
+                "src/lib.h": "",
+            }
+        )
+        config = cbuild.Config(
+            project_root=self.tmpdir.name,
+            cc="gcc",
+            ignore_dirs=["ignored"],
+            build_dir="build",
+            binary="main",
+        )
+        cbuild.build(config)
+        self._assert_nothing_ran()
+
 
 if __name__ == "__main__":
     unittest.main()
