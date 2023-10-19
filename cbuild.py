@@ -201,11 +201,13 @@ def resolve_include_paths(
     local_includes = []
     for include_type, include in includes:
         if include_type == "quote":
-            include_path = os.path.realpath(os.path.join(file_dir, include))
-            if include_path.startswith(project_root + "/"):
-                relative_path = include_path[len(project_root) + 1 :]
-                local_includes.append(relative_path)
-                continue
+            include_path = os.path.join(file_dir, include)
+            if os.path.isfile(include_path):
+                include_path = os.path.realpath(include_path)
+                if include_path.startswith(project_root + "/"):
+                    relative_path = include_path[len(project_root) + 1 :]
+                    local_includes.append(relative_path)
+                    continue
 
         for include_dir in include_dirs:
             include_path = os.path.join(include_dir, include)
@@ -221,7 +223,11 @@ def resolve_include_paths(
 
 def get_files_recursively(root, dirs_filter, files_filter):
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if dirs_filter(os.path.join(dirpath, d))]
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if dirs_filter(os.path.normpath(os.path.join(dirpath, d)))
+        ]
         dirpath = os.path.normpath(dirpath)
         for filename in filenames:
             filepath = os.path.join(dirpath, filename)
