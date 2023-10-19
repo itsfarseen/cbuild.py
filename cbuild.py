@@ -100,6 +100,8 @@ def build(
 
     object_files = []
 
+    mtime_memo = {}
+
     any_compiled = False
     for file in c_files:
         file_stat = os.stat(file)
@@ -119,7 +121,9 @@ def build(
         if file_mtime > object_mtime:
             should_recompile = True
         else:
-            should_recompile = any_dep_changed(dependencies, file, object_mtime)
+            should_recompile = any_dep_changed(
+                dependencies, file, object_mtime, mtime_memo
+            )
 
         if should_recompile:
             if not any_compiled:
@@ -140,13 +144,18 @@ def build(
     return True
 
 
-def any_dep_changed(dependencies, file, object_mtime):
+def any_dep_changed(dependencies, file, object_mtime, mtime_memo):
     for dep in dependencies[file]:
-        dep_stat = os.stat(dep)
-        dep_mtime = dep_stat.st_mtime
+        if dep in mtime_memo:
+            dep_mtime = mtime_memo[dep]
+        else:
+            dep_stat = os.stat(dep)
+            dep_mtime = dep_stat.st_mtime
+            mtime_memo[dep] = dep_mtime
+
         if dep_mtime > object_mtime:
             return True
-        if any_dep_changed(dependencies, dep, object_mtime):
+        if any_dep_changed(dependencies, dep, object_mtime, mtime_memo):
             return True
     return False
 
