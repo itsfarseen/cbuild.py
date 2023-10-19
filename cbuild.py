@@ -51,10 +51,10 @@ def main():
     if len(sys.argv) <= 1:
         usage()
     elif sys.argv[1] == "build":
-        build()
+        build(CONFIG)
     elif sys.argv[1] == "run":
-        if build():
-            run(CONFIG.binary)
+        if build(CONFIG):
+            run(os.path.join(CONFIG.build_dir, CONFIG.binary))
     elif sys.argv[1] == "clean":
         run(f"rm -rf {CONFIG.build_dir}")
     elif sys.argv[1] == "config":
@@ -63,11 +63,10 @@ def main():
         usage()
 
 
-def build(
-    config: Config,
-):
-    os.chdir(config.project_root)
+def build(config: CONFIG):
     config = copy.deepcopy(config)
+
+    os.chdir(config.project_root)
     if config.build_dir not in config.ignore_dirs:
         config.ignore_dirs.append(config.build_dir)
 
