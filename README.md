@@ -2,7 +2,7 @@
 
 A simple C build system.
 
-## Algorithm:
+## Algorithm
 
 - Find all .c files recursively starting from project root.
 - Parse `#include` lines and figure out which `.c` files depend on which `.h` files.
@@ -11,8 +11,8 @@ A simple C build system.
 
 ## How to use
 
-- Copy `cbuild.py` to your project root
-- Run `./cbuild.py config` to see the default config
+- Copy `cbuild.py` to your project root.
+- Run `./cbuild.py config` to see the default config.
 - Create `cbuild.json` if you want to override any of the config values.
 - Run `./cbuild.py run` to build and run your project.
 - See the output of `./cbuild.py help` for more info.
