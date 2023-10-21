@@ -16,3 +16,32 @@ A simple C build system.
 - Create `cbuild.json` if you want to override any of the config values.
 - Run `./cbuild.py run` to build and run your project.
 - See the output of `./cbuild.py help` for more info.
+
+## Configuration
+
+Create a `cbuild.json` file in the project root.
+
+### Example config
+
+```jsonc
+{
+  // Scan only files under this folder.
+  // Files outside this folder (eg. system libraries) are assumed to never change.
+  "project_root": ".", 
+  // C compiler executable.
+  "cc": "gcc",
+  // Flags to pass in during compiling
+  "cflags": "",
+  // Flags to pass in during linking
+  "ldflags": "",
+  // Ignore .c files in these folders.
+  "ignore_dirs": [
+    ".git",
+    ".ccls-cache"
+  ],
+  // Put build artifacts in this folder.
+  "build_dir": "build",
+  // Path to the final binary, relative to the build folder.
+  "binary": "main"
+}
+```
