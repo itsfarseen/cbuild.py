@@ -8,6 +8,8 @@ import dataclasses
 from dataclasses import dataclass, field
 import copy
 
+import subprocess as sp
+
 # Config
 
 _CBUILD_CONFIG_FILENAME = "cbuild.json"
@@ -19,9 +21,10 @@ class Config:
     cc: str = field(default="gcc")
     cflags: str = ""
     ldflags: str = ""
-    ignore_dirs: list = field(default_factory=lambda: [".git", ".ccls-cache"])
+    ignore_dirs: list[str] = field(default_factory=lambda: [".git", ".ccls-cache"])
     build_dir: str = "build"
     binary: str = "main"
+    dependencies: list[str] = field(default_factory=lambda: [])
 
 
 try:
@@ -63,12 +66,30 @@ def main():
         usage()
 
 
-def build(config: CONFIG):
+def build(config: Config):
     config = copy.deepcopy(config)
 
     os.chdir(config.project_root)
     if config.build_dir not in config.ignore_dirs:
         config.ignore_dirs.append(config.build_dir)
+
+    dependencies_cflags = []
+    dependencies_ldflags = []
+    for lib in config.dependencies:
+        p = sp.run(["pkg-config", "--cflags", lib], capture_output=True, text=True)
+        if p.returncode != 0:
+            print(f"Error: Can't find dependency {lib} (cflags)")
+            print(p.stdout)
+        dependencies_cflags.extend(p.stdout.split())
+
+        p = sp.run(["pkg-config", "--libs", lib], capture_output=True, text=True)
+        if p.returncode != 0:
+            print(f"Error: Can't find dependency {lib} (libs)")
+            print(p.stdout)
+        dependencies_ldflags.extend(p.stdout.split())
+
+    config.cflags = config.cflags + " ".join(dependencies_cflags)
+    config.ldflags = config.ldflags + " ".join(dependencies_ldflags)
 
     cflags_iter = iter(config.cflags.split())
     include_dirs = []
