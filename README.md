@@ -42,6 +42,12 @@ Create a `cbuild.json` file in the project root.
   // Put build artifacts in this folder.
   "build_dir": "build",
   // Path to the final binary, relative to the build folder.
-  "binary": "main"
+  "binary": "main",
+  // List of dependencies.
+  // For each entry in this list,
+  //   `pkg-config --cflags {lib}` will be invoked to get the cflags and
+  //   `pkg-config --libs {lib}` will be invoked to get the ldflags.
+  // Run `pkg-config --list-all` to see libraries available to in your system.
+  "dependencies": []
 }
 ```
