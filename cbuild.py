@@ -88,8 +88,8 @@ def build(config: Config):
             print(p.stdout)
         dependencies_ldflags.extend(p.stdout.split())
 
-    config.cflags = config.cflags + " ".join(dependencies_cflags)
-    config.ldflags = config.ldflags + " ".join(dependencies_ldflags)
+    config.cflags = config.cflags + " " + " ".join(dependencies_cflags)
+    config.ldflags = config.ldflags + " " + " ".join(dependencies_ldflags)
 
     cflags_iter = iter(config.cflags.split())
     include_dirs = []
