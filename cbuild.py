@@ -108,7 +108,7 @@ def build(config: Config):
         get_files_recursively(
             ".",
             dirs_filter=lambda d: d not in config.ignore_dirs,
-            files_filter=lambda f: any(f.endswith(ext) for ext in [".c"]),
+            files_filter=lambda f: f.endswith(".c"),
         )
     )
     dependencies = {}
