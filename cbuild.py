@@ -43,6 +43,7 @@ CONFIG = Config(**config_json)
 def usage():
     print()
     print("Commands:")
+    print("  init\t\t\t Initialize the config")
     print("  build\t\t\t Build the project")
     print("  run\t\t\t Build and run the project")
     print("  clean\t\t\t Remove the build directory")
@@ -53,6 +54,8 @@ def usage():
 def main():
     if len(sys.argv) <= 1:
         usage()
+    elif sys.argv[1] == "init":
+        init_config(config=CONFIG, config_loaded=config_loaded)
     elif sys.argv[1] == "build":
         build(CONFIG)
     elif sys.argv[1] == "run":
@@ -61,7 +64,7 @@ def main():
     elif sys.argv[1] == "clean":
         run(f"rm -rf {CONFIG.build_dir}")
     elif sys.argv[1] == "config":
-        print_config()
+        print_config(config=CONFIG, config_loaded=config_loaded)
     else:
         usage()
 
@@ -309,12 +312,21 @@ def run(cmd: str):
 #
 
 
-def print_config():
+def init_config(config, config_loaded):
+    if config_loaded:
+        print(f"{_CBUILD_CONFIG_FILENAME} found. Not initializing again.")
+        print()
+
+    with open(_CBUILD_CONFIG_FILENAME, "w") as f:
+        json.dump(dataclasses.asdict(config), fp=f, indent=2)
+
+
+def print_config(config, config_loaded):
     if not config_loaded:
         print(f"{_CBUILD_CONFIG_FILENAME} not found. Loading defaults.")
         print()
 
-    print(json.dumps(dataclasses.asdict(CONFIG), indent=2))
+    print(json.dumps(dataclasses.asdict(config), indent=2))
 
 
 if __name__ == "__main__":
