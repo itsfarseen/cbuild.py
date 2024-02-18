@@ -17,6 +17,26 @@ A simple C build system.
 - Run `./cbuild.py run` to build and run your project.
 - See the output of `./cbuild.py help` for more info.
 
+### Using as a submodule
+
+Why? Easier to update, get bug fixes faster.
+
+This shouldn't be necessary as time goes on and `cbuild.py` becomes more and more complete.
+
+```sh
+git submodule add https://github.com/itsfarseen/cbuild.py
+ln -s cbuild.py/cbuild.py cbuild
+```
+
+Commit the changes:
+
+```sh
+git add .gitmodules cbuild.py cbuild
+git commit
+```
+
+Now you can run cbuild using `./cbuild`
+
 ## Configuration
 
 Create a `cbuild.json` file in the project root.
